@@ -45,6 +45,12 @@ jobs:
       - name: Generate dashboard
         run: python generate_dashboard.py
 
+      - name: Generate Excel report
+        run: python generate_excel_report.py
+
+      - name: Generate PDF report
+        run: python generate_pdf_report.py
+
       - name: Upload dashboard artifact
         uses: actions/upload-pages-artifact@v3
         with:
