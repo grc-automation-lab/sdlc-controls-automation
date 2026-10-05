@@ -337,9 +337,9 @@ function showTab(id, btn) {{
 </body>
 </html>
 """
-    with open("reports/dashboard.html", "w") as f:
+    with open("reports/index.html", "w") as f:
         f.write(page)
-    print("Wrote reports/dashboard.html")
+    print("Wrote reports/index.html")
 
 
 if __name__ == "__main__":
