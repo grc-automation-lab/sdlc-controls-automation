@@ -10,3 +10,5 @@ venv/
 reports/evidence_*.json
 reports/results.json
 reports/dashboard.html
+reports/dashboard.xlsx
+reports/dashboard.pdf
