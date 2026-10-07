@@ -39,9 +39,19 @@ def compute(results):
     for control in results["controls"]:
         c_pass = 0
         c_fail = 0
+        c_findings = []
         for repo_name, repo_result in control["per_repo"].items():
             for finding in repo_result["findings"]:
                 status = finding.get("status")
+                has_name = bool(finding.get("title") or finding.get("login"))
+                c_findings.append({
+                    "repo": repo_name,
+                    "item": finding.get("title") or finding.get("login") or finding.get("detail", ""),
+                    "pr_number": finding.get("pr_number"),
+                    "status": status,
+                    "detail": finding.get("detail", "") if has_name else "",
+                    "role": finding.get("role"),
+                })
                 if status == "PASS":
                     c_pass += 1
                 elif status == "FAIL":
@@ -65,6 +75,7 @@ def compute(results):
             "framework_mapping": control["framework_mapping"],
             "pass_count": c_pass,
             "fail_count": c_fail,
+            "findings": c_findings,
             "pct": pct,
             "severity": _severity(pct),
         })
