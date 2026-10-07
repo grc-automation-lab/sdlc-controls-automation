@@ -55,6 +55,62 @@ def render_donut(pct, severity, size=180):
     """
 
 
+STATUS_PILL = {
+    "PASS": ("#dcfce7", "#16a34a", "PASS"),
+    "FAIL": ("#fee2e2", "#dc2626", "FAIL"),
+    "EVIDENCE": ("#dbeafe", "#2563eb", "EVIDENCE"),
+}
+STATUS_ORDER = {"FAIL": 0, "PASS": 1}
+
+
+def status_pill(status):
+    bg, fg, label = STATUS_PILL.get(status, ("#e5e7eb", "#374151", str(status)))
+    return f'<span class="st-pill" style="background:{bg};color:{fg};">{label}</span>'
+
+
+def render_control_details(control):
+    findings = control["findings"]
+    if not findings:
+        return '<p class="empty-state">No findings recorded yet for this control.</p>'
+
+    is_access = all(f["status"] == "EVIDENCE" for f in findings)
+
+    if is_access:
+        rows = "".join(
+            f"<tr><td>{html.escape(f['repo'])}</td>"
+            f"<td>{html.escape(f['item'])}</td>"
+            f"<td><span class=\"role-pill\">{html.escape(str(f.get('role') or 'unknown'))}</span></td></tr>"
+            for f in findings
+        )
+        return f"""
+        <p class="details-intro">Snapshot of who currently has access. The automation captures this
+        daily; a person still decides whether each level is appropriate.</p>
+        <table class="details-table">
+          <thead><tr><th>Repo</th><th>User</th><th>Access level</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>
+        """
+
+    ordered = sorted(findings, key=lambda f: STATUS_ORDER.get(f["status"], 2))
+    rows = []
+    for f in ordered:
+        pr_label = f"PR #{f['pr_number']} \u2014 " if f.get("pr_number") else ""
+        rows.append(
+            f"<tr><td>{html.escape(f['repo'])}</td>"
+            f"<td>{pr_label}{html.escape(f['item'])}</td>"
+            f"<td>{status_pill(f['status'])}</td>"
+            f"<td class=\"detail-cell\">{html.escape(f['detail'])}</td></tr>"
+        )
+    return f"""
+    <p class="details-intro"><strong>{control['pass_count']}</strong> passed,
+    <strong>{control['fail_count']}</strong> failed. Failures are listed first.</p>
+    <table class="details-table">
+      <thead><tr><th>Repo</th><th>Item</th><th>Result</th><th>Details</th></tr></thead>
+      <tbody>{''.join(rows)}</tbody>
+    </table>
+    """
+
+
 def render_control_card(control):
     pct = control["pct"]
     severity = control["severity"]
@@ -67,8 +123,10 @@ def render_control_card(control):
     mapping = control["framework_mapping"]
     mapping_html = " &middot; ".join(f"<strong>{k.upper()}</strong> {html.escape(str(v))}" for k, v in mapping.items())
 
+    details_html = render_control_details(control)
+
     return f"""
-    <div class="card">
+    <div class="card" id="card-{html.escape(control['id'])}" onclick="toggleCard(this)" tabindex="0" onkeydown="if(event.key==='Enter')toggleCard(this)">
       <div class="card-top">
         <div>
           <div class="card-id">{html.escape(control['id'])}</div>
@@ -85,7 +143,9 @@ def render_control_card(control):
       <div class="card-counts">
         <span class="count-pass">{control['pass_count']} pass</span>
         <span class="count-fail">{control['fail_count']} fail</span>
+        <span class="view-hint">View details <span class="chev">&#9662;</span></span>
       </div>
+      <div class="details" onclick="event.stopPropagation()">{details_html}</div>
     </div>
     """
 
@@ -222,6 +282,22 @@ def main():
   .count-pass {{ color: #16a34a; font-weight: 600; margin-right: 10px; }}
   .count-fail {{ color: #dc2626; font-weight: 600; }}
 
+  .card {{ cursor: pointer; transition: box-shadow 0.2s ease, border-color 0.2s ease; }}
+  .card:hover {{ box-shadow: 0 4px 14px rgba(79,70,229,0.12); border-color: #c7d2fe; }}
+  .card.open {{ grid-column: 1 / -1; border-color: var(--accent); }}
+  .card-counts {{ display: flex; align-items: center; gap: 0; }}
+  .view-hint {{ margin-left: auto; font-size: 12px; font-weight: 600; color: var(--accent); }}
+  .chev {{ display: inline-block; transition: transform 0.2s ease; }}
+  .card.open .chev {{ transform: rotate(180deg); }}
+  .details {{ display: none; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); cursor: default; }}
+  .card.open .details {{ display: block; }}
+  .details-intro {{ font-size: 13px; color: var(--muted); margin: 0 0 10px; }}
+  .details-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+  .details-table th {{ background: #f9fafb; text-align: left; padding: 8px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }}
+  .details-table td {{ padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }}
+  .st-pill {{ font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }}
+  .role-pill {{ background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }}
+
   .remediation-note {{
     background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
     border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-bottom: 22px;
@@ -286,6 +362,10 @@ def main():
 </div>
 
 <script>
+function toggleCard(el) {{
+  el.classList.toggle('open');
+}}
+
 function showTab(id, btn) {{
   document.querySelectorAll('.tab-panel').forEach(function(p) {{ p.classList.remove('active'); }});
   document.querySelectorAll('.tab-btn').forEach(function(b) {{ b.classList.remove('active'); }});
